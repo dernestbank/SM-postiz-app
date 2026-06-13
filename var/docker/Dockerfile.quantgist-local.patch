@@ -1,0 +1,18 @@
+# QuantGist: LinkedIn personal OAuth scopes (no org/CMA scopes) on upstream image.
+FROM ghcr.io/gitroomhq/postiz-app:latest
+COPY libraries/nestjs-libraries/src/integrations/social/linkedin.provider.ts \
+  /app/libraries/nestjs-libraries/src/integrations/social/linkedin.provider.ts
+RUN set -eu; \
+  grep -rlE 'w_organization_social|r_organization_social' /app/apps/backend/dist | while read -r compiledFile; do \
+    sed -i \
+      -e "/r_basicprofile/d" \
+      -e "/rw_organization_admin/d" \
+      -e "/w_organization_social/d" \
+      -e "/r_organization_social/d" \
+      "$compiledFile"; \
+  done; \
+  ! grep -rqE 'w_organization_social|r_organization_social' /app/apps/backend/dist
+# QuantGist: startMcp() runs before app.listen() and can block :3000 on ARM Docker (Mastra/MCP init).
+RUN sed -i \
+  's/await (0, start_mcp_1.startMcp)(app);/\/\/ await (0, start_mcp_1.startMcp)(app); \/\/ QuantGist: defer MCP so API binds/' \
+  /app/apps/backend/dist/apps/backend/src/main.js

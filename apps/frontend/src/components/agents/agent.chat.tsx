@@ -34,12 +34,24 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { ExistingDataContextProvider } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import useCookie from 'react-use-cookie';
+
+const OPENCLAW_AGENT_OPTIONS = [
+  { id: 'QG_MARKETING', label: 'QG Marketing (strategy)' },
+  { id: 'QG_SOCIAL_MEDIA_MANAGER', label: 'QG Social Media Manager' },
+] as const;
 
 export const AgentChat: FC = () => {
   const { backendUrl } = useVariables();
   const params = useParams<{ id: string }>();
   const { properties } = useContext(PropertiesContext);
   const t = useT();
+  const [openClawAgent, setOpenClawAgent] = useCookie(
+    'postizOpenClawAgent',
+    'QG_MARKETING'
+  );
+  const useOpenClawBridge =
+    process.env.NEXT_PUBLIC_POSTIZ_OPENCLAW_BRIDGE === 'enabled';
 
   return (
     <CopilotKit
@@ -47,9 +59,15 @@ export const AgentChat: FC = () => {
       credentials="include"
       runtimeUrl={backendUrl + '/copilot/agent'}
       showDevConsole={false}
-      agent="postiz"
+      agent={useOpenClawBridge ? undefined : 'postiz'}
+      headers={
+        useOpenClawBridge
+          ? { 'x-postiz-openclaw-agent': openClawAgent }
+          : undefined
+      }
       properties={{
         integrations: properties,
+        ...(useOpenClawBridge ? { openclawAgent: openClawAgent } : {}),
       }}
     >
       <Hooks />
@@ -63,12 +81,41 @@ export const AgentChat: FC = () => {
         }
         className="trz agent bg-newBgColorInner flex flex-col gap-[15px] transition-all flex-1 items-center relative"
       >
+        {useOpenClawBridge && (
+          <div className="w-full px-[20px] pt-[12px] flex items-center gap-[10px] z-10">
+            <span className="text-sm text-textColor/70">
+              {t('openclaw_agent', 'OpenClaw agent')}
+            </span>
+            <select
+              className="bg-newBgColor border border-newBgColorInner rounded-[8px] px-[10px] py-[6px] text-sm"
+              value={openClawAgent}
+              onChange={(event) => setOpenClawAgent(event.target.value)}
+            >
+              {OPENCLAW_AGENT_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="absolute left-0 w-full h-full pb-[20px]">
           <CopilotChat
             className="w-full h-full"
             labels={{
-              title: t('your_assistant', 'Your Assistant'),
-              initial: t('agent_welcome_message', `Hello, I am your Postiz agent 🙌🏻.
+              title: useOpenClawBridge
+                ? openClawAgent
+                : t('your_assistant', 'Your Assistant'),
+              initial: useOpenClawBridge
+                ? t(
+                    'openclaw_agent_welcome_message',
+                    `You are connected to ${openClawAgent} via OpenClaw (Codex OAuth).
+
+Select channels on the left. Ask for campaign strategy, Postiz scheduling help, or content review.
+
+Switch agent with the dropdown above (Marketing vs Social Media Manager).`
+                  )
+                : t('agent_welcome_message', `Hello, I am your Postiz agent 🙌🏻.
               
 I can schedule a post or multiple posts to multiple channels and generate pictures and videos.
 
